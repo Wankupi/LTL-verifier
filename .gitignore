@@ -1,0 +1,8 @@
+.vscode/
+.antlr/
+build/
+.xmake/
+compile_commands.json
+.cache
+benchmark.txt
+TS.txt

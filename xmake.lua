@@ -1,0 +1,17 @@
+add_requires("antlr4-runtime 4.13.2")
+add_rules("mode.debug")
+set_languages("c++23")
+
+target("antlr-g4")
+    set_kind("static")
+    add_files("antlr/*.cpp")
+    add_packages("antlr4-runtime")
+    add_includedirs("/usr/include/antlr4-runtime")
+
+target("LTL-verifier")
+    set_kind("binary")
+    add_files("src/**.cpp")
+    add_deps("antlr-g4")
+    add_includedirs("antlr", {public = true})
+    add_includedirs("/usr/include/antlr4-runtime")
+    set_rundir("$(projectdir)")
