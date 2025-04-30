@@ -1,25 +1,24 @@
 #pragma once
+#include "utils/type.h"
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <string>
 #include <vector>
-using bitset = unsigned long long;
 
 struct TransitionSystem {
 	int num_states = 0;      // number of states
 	int num_transitions = 0; // number of transitions
 	int num_actions = 0;
 
-	using state_set = unsigned long long;
-	using ap_set = unsigned long long;
-	using state = int;
-	using action = int;
+	using StateSet = unsigned long long;
+	using State = int;
+	using Action = int;
 
-	bitset init_states;                                       // initial states
-	std::vector<std::string> AP;                              // atomic propositions
-	std::map<state, std::map<action, state_set>> transitions; // transitions
-	std::map<state, ap_set> labels;                           // labels
+	StateSet init_states;                                    // initial states
+	std::vector<std::string> AP;                             // atomic propositions
+	std::map<State, std::map<Action, StateSet>> transitions; // transitions
+	std::map<State, AtomicPropositionSet> labels;            // labels
 
 	// Constructor
 	TransitionSystem(std::istream &is) {
@@ -49,7 +48,7 @@ struct TransitionSystem {
 		}
 		for (int i = 0; i < num_states; ++i) {
 			line = linestream();
-			ap_set ap = 0;
+			AtomicPropositionSet ap = 0;
 			while (line >> x) ap |= (1 << x);
 			labels[i] = ap;
 		}

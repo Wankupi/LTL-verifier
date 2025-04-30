@@ -1,38 +1,65 @@
 #pragma once
+#include "TransitionSystem.h"
+#include <cassert>
+#include <compare>
+#include <curses.h>
 #include <format>
+#include <iostream>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <tuple>
 #include <typeindex>
-#include <unordered_map>
+#include <utility>
 
 namespace LTL {
 
 struct BaseNode {
+	int height = 0;
 	virtual ~BaseNode() = default;
-	virtual std::string stringify() const {
-		return {};
+	BaseNode() = default;
+	BaseNode(int height) : height(height) {}
+	virtual std::string stringify() const = 0;
+	template<typename T>
+		requires std::is_base_of_v<BaseNode, T>
+	T *as() {
+		return dynamic_cast<T *>(this);
+	}
+	template<typename T>
+		requires std::is_base_of_v<BaseNode, T>
+	T const *as() const {
+		return dynamic_cast<T const *>(this);
 	}
 };
+
+inline std::ostream &operator<<(std::ostream &os, BaseNode const *node) {
+	// os << std::format("{}({}){}", DBG_RED, (void const *) (node), DBG_RESET);
+	return os << node->stringify();
+}
+
+inline std::ostream &operator<<(std::ostream &os, BaseNode const &node) {
+	return os << &node;
+}
 
 // using NodePtr = std::unique_ptr<BaseNode>;
 using NodePtr = BaseNode *;
 
 struct UnaryNode : public BaseNode {
 	NodePtr child;
-	UnaryNode(NodePtr child) : child(std::move(child)) {}
+	UnaryNode(NodePtr child) : BaseNode(child->height + 1), child(std::move(child)) {}
 };
 
 struct BinaryNode : public BaseNode {
 	NodePtr left;
 	NodePtr right;
-	BinaryNode(NodePtr left, NodePtr right) : left(std::move(left)), right(std::move(right)) {}
+	BinaryNode(NodePtr left, NodePtr right) : BaseNode(std::max(left->height, right->height) + 1), left(std::move(left)), right(std::move(right)) {}
 };
 
 struct AtomNode : public BaseNode {
 	std::string name;
-	AtomNode(std::string name) : name(std::move(name)) {}
+	int id = 0;
+	AtomNode(std::string name, int id) : name(std::move(name)), id(id) {}
 	std::string stringify() const override {
 		return name;
 	}
@@ -42,74 +69,77 @@ struct LiteralBooleanNode : public BaseNode {
 	bool value;
 	LiteralBooleanNode(bool value) : value(value) {}
 	std::string stringify() const override {
-		return value ? "True" : "False";
+		return value ? "true" : "false";
 	}
 };
 
 struct NotNode : public UnaryNode {
 	using UnaryNode::UnaryNode;
 	std::string stringify() const override {
-		return std::format("Not({})", child->stringify());
+		return std::format("not({})", child->stringify());
 	}
 };
 
 struct AlwaysNode : public UnaryNode {
 	using UnaryNode::UnaryNode;
 	std::string stringify() const override {
-		return std::format("Always({})", child->stringify());
+		return std::format("always({})", child->stringify());
 	}
 };
 
 struct EventuallyNode : public UnaryNode {
 	using UnaryNode::UnaryNode;
 	std::string stringify() const override {
-		return std::format("Eventually({})", child->stringify());
+		return std::format("eventually({})", child->stringify());
 	}
 };
 
 struct NextNode : public UnaryNode {
 	using UnaryNode::UnaryNode;
 	std::string stringify() const override {
-		return std::format("Next({})", child->stringify());
+		return std::format("next({})", child->stringify());
 	}
 };
 
 struct UntilNode : public BinaryNode {
 	using BinaryNode::BinaryNode;
 	std::string stringify() const override {
-		return std::format("({}) Until ({})", left->stringify(), right->stringify());
+		return std::format("({}) until ({})", left->stringify(), right->stringify());
 	}
 };
 
 struct ImplicationNode : public BinaryNode {
 	using BinaryNode::BinaryNode;
 	std::string stringify() const override {
-		return std::format("({}) Implication ({})", left->stringify(), right->stringify());
+		return std::format("({}) -> ({})", left->stringify(), right->stringify());
 	}
 };
 
 struct AndNode : public BinaryNode {
 	using BinaryNode::BinaryNode;
 	std::string stringify() const override {
-		return std::format("({}) And ({})", left->stringify(), right->stringify());
+		return std::format("({}) and ({})", left->stringify(), right->stringify());
 	}
 };
 
 struct OrNode : public BinaryNode {
 	using BinaryNode::BinaryNode;
 	std::string stringify() const override {
-		return std::format("({}) Or ({})", left->stringify(), right->stringify());
+		return std::format("({}) or ({})", left->stringify(), right->stringify());
 	}
 };
 
 
 class LTLAllocator {
-	std::unordered_map<std::string, std::unique_ptr<AtomNode>> atom_nodes;
+	TransitionSystem const &ts;
+	std::vector<std::unique_ptr<AtomNode>> atom_nodes;
 	std::unique_ptr<LiteralBooleanNode> bool_nodes[2];
 	std::map<std::tuple<std::type_index, BaseNode *>, std::unique_ptr<UnaryNode>> unary_nodes;
 	std::map<std::tuple<std::type_index, BaseNode *, BaseNode *>, std::unique_ptr<BinaryNode>> binary_nodes;
 
 public:
+	LTLAllocator(TransitionSystem const &ts) : ts(ts), atom_nodes(ts.AP.size()) {}
+
 	template<typename T>
 	BaseNode *create(BaseNode *child) {
 		auto it = unary_nodes.find({typeid(T), child});
@@ -131,13 +161,11 @@ public:
 		return ptr;
 	}
 	BaseNode *createAtomNode(std::string const &name) {
-		auto it = atom_nodes.find(name);
-		if (it != atom_nodes.end())
-			return it->second.get();
-		auto node = std::make_unique<AtomNode>(name);
-		auto ptr = node.get();
-		atom_nodes[name] = std::move(node);
-		return ptr;
+		unsigned long id = std::find(ts.AP.begin(), ts.AP.end(), name) - ts.AP.begin();
+		assert(id < ts.AP.size());
+		if (!atom_nodes[id])
+			atom_nodes[id] = std::make_unique<AtomNode>(name, id);
+		return atom_nodes[id].get();
 	}
 	BaseNode *createLiteralBooleanNode(bool value) {
 		auto index = value ? 1 : 0;
@@ -152,4 +180,51 @@ public:
 
 NodePtr LTL_parse(const std::string &formula, LTLAllocator &allocator);
 
+inline BaseNode *remove_not(BaseNode *node) {
+	if (auto not_node = node->as<NotNode>())
+		return not_node->child;
+	return node;
+}
+
+inline bool is_not(BaseNode *node) {
+	return node->as<NotNode>() != nullptr;
+}
+
+inline std::strong_ordering operator<=>(BaseNode const &lhs, BaseNode const &rhs) {
+	if (lhs.height != rhs.height)
+		return lhs.height <=> rhs.height;
+	auto lhs_type = std::type_index(typeid(lhs));
+	auto rhs_type = std::type_index(typeid(rhs));
+	if (lhs_type != rhs_type)
+		return lhs_type <=> rhs_type;
+	if (auto lhs_atom = lhs.as<AtomNode>()) {
+		auto rhs_atom = rhs.as<AtomNode>();
+		return lhs_atom->id <=> rhs_atom->id;
+	}
+	else if (auto lhs_literal = lhs.as<LiteralBooleanNode>()) {
+		auto rhs_literal = rhs.as<LiteralBooleanNode>();
+		return lhs_literal->value <=> rhs_literal->value;
+	}
+	else if (auto lhs_unary = lhs.as<UnaryNode>()) {
+		auto rhs_unary = rhs.as<UnaryNode>();
+		return *(lhs_unary->child) <=> *(rhs_unary->child);
+	}
+	else if (auto lhs_binary = lhs.as<BinaryNode>()) {
+		auto rhs_binary = rhs.as<BinaryNode>();
+		auto cmp = *(lhs_binary->left) <=> *(rhs_binary->left);
+		if (cmp != std::strong_ordering::equal)
+			return cmp;
+		return *(lhs_binary->right) <=> *(rhs_binary->right);
+	}
+	std::unreachable();
+}
+
 } // namespace LTL
+
+template<>
+struct std::formatter<LTL::BaseNode> : public std::formatter<std::string> {
+	formatter() = default;
+	auto format(LTL::BaseNode const &node, std::format_context &ctx) const {
+		return this->std::formatter<std::string>::format(node.stringify(), ctx);
+	}
+};

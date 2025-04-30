@@ -1,10 +1,12 @@
 #include "LTL/LTL.h"
+#include "NBA/NBA.h"
 #include "TransitionSystem.h"
+#include "utils/color.h"
 #include <cassert>
+#include <curses.h>
 #include <fstream>
 #include <iostream>
 #include <string>
-
 
 TransitionSystem read_ts() {
 	std::ifstream ts_file("TS.txt");
@@ -25,13 +27,14 @@ int main() {
 	ltl_file >> A >> B;
 	while (ltl_file.get() != '\n'); // skip
 
-	LTL::LTLAllocator allocator;
+	LTL::LTLAllocator allocator{TS};
 
 	for (int i = 0; i < A; ++i) {
 		std::string str;
 		std::getline(ltl_file, str);
 		auto root = LTL::LTL_parse(str, allocator);
-		std::cout << "LTL: " << root->stringify() << std::endl;
+		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
+		NBA::GNBA gnba(root, TS.AP.size());
 	}
 	for (int i = 0; i < B; ++i) {
 		int state = 0;
@@ -39,7 +42,8 @@ int main() {
 		std::string str;
 		std::getline(ltl_file, str);
 		auto root = LTL::LTL_parse(str, allocator);
-		std::cout << "LTL: " << root->stringify() << std::endl;
+		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
+		NBA::GNBA gnba(root, TS.AP.size());
 	}
 	return 0;
 }

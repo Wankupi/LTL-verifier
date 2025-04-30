@@ -47,13 +47,13 @@ public:
 	std::any visitConjunction(LTLParser::ConjunctionContext *ctx) override {
 		return allocator.create<AndNode>(visit(ctx->lhs), visit(ctx->rhs));
 	}
-	std::any visitTrue(LTLParser::TrueContext *ctx) override {
+	std::any visitTrue(LTLParser::TrueContext *) override {
 		return allocator.createLiteralBooleanNode(true);
 	}
 	std::any visitAlways(LTLParser::AlwaysContext *ctx) override {
 		return allocator.create<AlwaysNode>(visit(ctx->child));
 	}
-	std::any visitFalse(LTLParser::FalseContext *ctx) override {
+	std::any visitFalse(LTLParser::FalseContext *) override {
 		return allocator.createLiteralBooleanNode(false);
 	}
 	std::any visitImplication(LTLParser::ImplicationContext *ctx) override {
@@ -67,6 +67,28 @@ public:
 	}
 };
 
+void LTL_check(BaseNode *node) {
+	if (!node) throw std::runtime_error("LTL_check: node is null");
+	if (auto unary_node = node->as<UnaryNode>())
+		LTL_check(unary_node->child);
+	else if (auto binary_node = node->as<BinaryNode>()) {
+		LTL_check(binary_node->left);
+		LTL_check(binary_node->right);
+	}
+	else if (auto atom_node = node->as<AtomNode>()) {
+		if (atom_node->id < 0)
+			throw std::runtime_error("LTL_check: atom id is negative");
+		std::cout << std::format("atom id = {}\n", atom_node->id);
+	}
+	else if (auto literal_node = node->as<LiteralBooleanNode>()) {
+		if (literal_node->value != true && literal_node->value != false)
+			throw std::runtime_error("LTL_check: literal value is not boolean");
+	}
+	else {
+		throw std::runtime_error("LTL_check: unknown node type");
+	}
+}
+
 NodePtr LTL::LTL_parse(const std::string &formula, LTLAllocator &allocator) {
 	auto input = antlr4::ANTLRInputStream(formula);
 	auto lexer = LTLLexer(&input);
@@ -76,5 +98,6 @@ NodePtr LTL::LTL_parse(const std::string &formula, LTLAllocator &allocator) {
 
 	auto visitor = LTLBuilder(allocator);
 	auto result = visitor.visit(tree);
+	LTL_check(result);
 	return result;
 }
