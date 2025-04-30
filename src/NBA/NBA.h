@@ -1,6 +1,7 @@
 #pragma once
 #include "LTL/LTL.h"
 #include "utils/type.h"
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -26,11 +27,41 @@ struct GNBA : Automaton {
 	void remove_unreachable();
 };
 
-struct NBA : Automaton {
-	StateSet final_states = 0; // final states
-
+struct NBA : GNBA {
 	NBA(GNBA const &gnba);
 };
 
-
 } // namespace NBA
+
+template<>
+class std::formatter<NBA::GNBA> {
+public:
+	template<typename ParseContext>
+	constexpr auto parse(ParseContext &ctx) {
+		return ctx.begin();
+	}
+
+	template<typename FormatContext>
+	auto format(NBA::GNBA const &gnba, FormatContext &ctx) const {
+		auto it = ctx.out();
+		std::format_to(it, R"!(
+GNBA(num_states={})
+  init_states={:0{}b}
+  final_states=)!",
+					   gnba.num_states, gnba.init_states, gnba.num_states);
+
+		for (auto const &fs: gnba.final_states_list)
+			std::format_to(it, "{:0{}b} ", fs, gnba.num_states);
+		std::format_to(it, "\n  transitions:\n");
+		for (int i = 0; i < gnba.num_states; ++i) {
+			for (auto const &[ap, out_edges]: gnba.transitions[i]) {
+				std::format_to(it, "    {} - {:0{}b} -> {{", i, ap, gnba.num_AP);
+				for (int j = 0; j < gnba.num_states; ++j)
+					if ((out_edges >> j) & 1)
+						std::format_to(it, "{},", j);
+				std::format_to(it, "}}\n");
+			}
+		}
+		return it;
+	}
+};

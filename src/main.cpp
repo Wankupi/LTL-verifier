@@ -36,6 +36,7 @@ int main() {
 		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
 		NBA::GNBA gnba(allocator, root, TS.AP.size());
 		gnba.remove_unreachable();
+		std::cout << std::format("{}", gnba) << std::endl;
 	}
 	for (int i = 0; i < B; ++i) {
 		int state = 0;
@@ -46,6 +47,7 @@ int main() {
 		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
 		NBA::GNBA gnba(allocator, root, TS.AP.size());
 		gnba.remove_unreachable();
+		std::cout << std::format("{}", gnba) << std::endl;
 	}
 	return 0;
 }

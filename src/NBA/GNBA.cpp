@@ -366,14 +366,14 @@ void NBA::GNBA::remove_unreachable() {
 		if ((reachable >> i) & 1)
 			new_states_map[i] = this->num_states++;
 
-
 	auto old_state_set_to_new_state_set = [&](StateSet old_state_set) {
 		StateSet new_state_set = 0;
-		for (int i = 0; i < this->num_states; ++i)
-			if ((old_state_set >> i) & 1)
+		for (int i = 0; i < lastStateCnt; ++i)
+			if (((old_state_set >> i) & 1) && ((reachable >> i) & 1))
 				new_state_set |= (1ull << new_states_map[i]);
 		return new_state_set;
 	};
+
 	// modify transitions
 	decltype(this->transitions) new_transitions(this->num_states);
 	for (int i = 0; i < lastStateCnt; ++i) {
@@ -387,9 +387,15 @@ void NBA::GNBA::remove_unreachable() {
 		}
 	}
 	std::swap(new_transitions, this->transitions);
+
 	// modify init_states
 	this->init_states = old_state_set_to_new_state_set(this->init_states);
+
 	// modify final_states_list
-	for (auto &fs: this->final_states_list)
+	decltype(this->final_states_list) new_final_states_list;
+	for (auto &fs: this->final_states_list) {
 		fs = old_state_set_to_new_state_set(fs);
+		if (fs != 0)
+			new_final_states_list.emplace_back(fs);
+	}
 }
