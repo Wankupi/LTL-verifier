@@ -78,11 +78,9 @@ void LTL_check(BaseNode *node) {
 	else if (auto atom_node = node->as<AtomNode>()) {
 		if (atom_node->id < 0)
 			throw std::runtime_error("LTL_check: atom id is negative");
-		std::cout << std::format("atom id = {}\n", atom_node->id);
 	}
-	else if (auto literal_node = node->as<LiteralBooleanNode>()) {
-		if (literal_node->value != true && literal_node->value != false)
-			throw std::runtime_error("LTL_check: literal value is not boolean");
+	else if (node->as<LiteralTrue>()) {
+		// pass
 	}
 	else {
 		throw std::runtime_error("LTL_check: unknown node type");

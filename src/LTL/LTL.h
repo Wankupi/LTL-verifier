@@ -17,9 +17,11 @@ namespace LTL {
 
 struct BaseNode {
 	int height = 0;
-	virtual ~BaseNode() = default;
+
+public:
 	BaseNode() = default;
 	BaseNode(int height) : height(height) {}
+	virtual ~BaseNode() = default;
 	virtual std::string stringify() const = 0;
 	template<typename T>
 		requires std::is_base_of_v<BaseNode, T>
@@ -31,6 +33,12 @@ struct BaseNode {
 	T const *as() const {
 		return dynamic_cast<T const *>(this);
 	}
+	bool is_not() const;
+	BaseNode const *remove_not() const;
+	BaseNode *remove_not() {
+		return const_cast<BaseNode *>(static_cast<BaseNode const *>(this)->remove_not());
+	}
+	bool is_bool() const;
 };
 
 inline std::ostream &operator<<(std::ostream &os, BaseNode const *node) {
@@ -65,17 +73,21 @@ struct AtomNode : public BaseNode {
 	}
 };
 
-struct LiteralBooleanNode : public BaseNode {
-	bool value;
-	LiteralBooleanNode(bool value) : value(value) {}
+struct LiteralTrue : public BaseNode {
+	LiteralTrue() = default;
 	std::string stringify() const override {
-		return value ? "true" : "false";
+		return "true";
 	}
 };
 
 struct NotNode : public UnaryNode {
-	using UnaryNode::UnaryNode;
+	NotNode(NodePtr child) : UnaryNode(child) {
+		if (child->as<LiteralTrue>()) // one special case
+			this->height = child->height;
+	}
 	std::string stringify() const override {
+		if (child->as<LiteralTrue>())
+			return "false"; // special case
 		return std::format("not({})", child->stringify());
 	}
 };
@@ -133,7 +145,7 @@ struct OrNode : public BinaryNode {
 class LTLAllocator {
 	TransitionSystem const &ts;
 	std::vector<std::unique_ptr<AtomNode>> atom_nodes;
-	std::unique_ptr<LiteralBooleanNode> bool_nodes[2];
+	LiteralTrue true_node;
 	std::map<std::tuple<std::type_index, BaseNode *>, std::unique_ptr<UnaryNode>> unary_nodes;
 	std::map<std::tuple<std::type_index, BaseNode *, BaseNode *>, std::unique_ptr<BinaryNode>> binary_nodes;
 
@@ -168,26 +180,26 @@ public:
 		return atom_nodes[id].get();
 	}
 	BaseNode *createLiteralBooleanNode(bool value) {
-		auto index = value ? 1 : 0;
-		if (bool_nodes[index])
-			return bool_nodes[index].get();
-		auto node = std::make_unique<LiteralBooleanNode>(value);
-		auto ptr = node.get();
-		bool_nodes[index] = std::move(node);
-		return ptr;
+		if (value)
+			return &true_node;
+		return create<NotNode>(&true_node);
 	}
 };
 
 NodePtr LTL_parse(const std::string &formula, LTLAllocator &allocator);
 
-inline BaseNode *remove_not(BaseNode *node) {
-	if (auto not_node = node->as<NotNode>())
+inline BaseNode const *BaseNode::remove_not() const {
+	if (auto not_node = this->as<NotNode>())
 		return not_node->child;
-	return node;
+	return this;
 }
 
-inline bool is_not(BaseNode *node) {
-	return node->as<NotNode>() != nullptr;
+inline bool BaseNode::is_not() const {
+	return this->as<NotNode>();
+}
+
+inline bool BaseNode::is_bool() const {
+	return this->remove_not()->as<LiteralTrue>();
 }
 
 inline std::strong_ordering operator<=>(BaseNode const &lhs, BaseNode const &rhs) {
@@ -201,9 +213,10 @@ inline std::strong_ordering operator<=>(BaseNode const &lhs, BaseNode const &rhs
 		auto rhs_atom = rhs.as<AtomNode>();
 		return lhs_atom->id <=> rhs_atom->id;
 	}
-	else if (auto lhs_literal = lhs.as<LiteralBooleanNode>()) {
-		auto rhs_literal = rhs.as<LiteralBooleanNode>();
-		return lhs_literal->value <=> rhs_literal->value;
+	else if (lhs.as<LiteralTrue>()) {
+		return std::strong_ordering::equal;
+		// auto rhs_literal = rhs.as<LiteralTrue>();
+		// return lhs_literal->value <=> rhs_literal->value;
 	}
 	else if (auto lhs_unary = lhs.as<UnaryNode>()) {
 		auto rhs_unary = rhs.as<UnaryNode>();

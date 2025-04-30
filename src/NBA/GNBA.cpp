@@ -22,11 +22,12 @@ std::vector<LTL::BaseNode *> get_closure(LTL::BaseNode *root) {
 		auto node = q.front();
 		q.pop();
 
+		node = node->remove_not();
+
 		// do not add literal true or false to the closure
-		if (node->as<LiteralBooleanNode>())
+		if (node->as<LiteralTrue>())
 			continue;
 
-		node = remove_not(node);
 		if (closure.find(node) != closure.end()) continue;
 		closure.insert(node);
 
@@ -50,8 +51,8 @@ struct Validator {
 	bool resolve(LTL::BaseNode *node, bool expected) const {
 		if (node->as<AtomNode>())
 			return expected;
-		else if (auto literal = node->as<LiteralBooleanNode>())
-			return literal->value;
+		else if (node->as<LiteralTrue>())
+			return true;
 		else if (auto binary_node = node->as<BinaryNode>()) {
 			if (node->as<UntilNode>())
 				// local: a until b = b or (a and next(a until b))
@@ -118,9 +119,11 @@ std::vector<ElementSet> get_all_element_set(std::vector<BaseNode *> const &closu
 }
 
 bool is_formula_in_element_set(std::vector<BaseNode *> const &closure, ElementSet B, BaseNode *formula) {
-	size_t index = std::find(closure.begin(), closure.end(), remove_not(formula)) - closure.begin();
+	auto pure_node = formula->remove_not();
+	if (pure_node->as<LiteralTrue>()) return !formula->is_not();
+	size_t index = std::find(closure.begin(), closure.end(), pure_node) - closure.begin();
 	assert(index < closure.size());
-	return ((B >> index) & 1) == !is_not(formula);
+	return ((B >> index) & 1) == !formula->is_not();
 };
 
 struct Mask {
@@ -207,32 +210,45 @@ AtomicPropositionSet get_AP_set(std::vector<LTL::BaseNode *> const &closure, Ele
 
 /// @attention from this function, we should take care of the LiteralBooleanNode
 NBA::GNBA::StateSet generate_final_states(
+		LTL::LTLAllocator &ltl_allocator,
 		std::vector<LTL::BaseNode *> const &closure,
 		std::vector<ElementSet> const &element_sets,
 		LTL::BaseNode *formula) {
 	// only return non-zero when is { Always, Eventually, Until }
-	BaseNode *left = nullptr, *right = nullptr;
-	LiteralBooleanNode true_(true), false_(false);
-	if (auto always_node = formula->as<AlwaysNode>()) {
+	// unify them to a until b
+	// a is useless
+	BaseNode *b = nullptr;
+	if (formula->as<AlwaysNode>()) {
 		// always a = a until false
-		left = always_node->child;
-		right = &false_;
+		// a = always_node->child;
+		b = ltl_allocator.createLiteralBooleanNode(false);
 	}
 	else if (auto eventually_node = formula->as<EventuallyNode>()) {
 		// eventually a = true until a
-		left = &true_;
-		right = eventually_node->child;
+		// a = ltl_allocator.createLiteralBooleanNode(true);
+		b = eventually_node->child;
 	}
 	else if (auto until_node = formula->as<UntilNode>()) {
-		left = until_node->left;
-		right = until_node->right;
+		// a = until_node->left;
+		b = until_node->right;
 	}
 	else
 		return 0;
-	// TODO:
+	// a until b
+	NBA::GNBA::StateSet result = 0;
+	for (size_t i = 0; i < element_sets.size(); ++i) {
+		// std::cout << std::format("")
+		if (!is_formula_in_element_set(closure, element_sets[i], formula) // (a until b) not in B
+			|| is_formula_in_element_set(closure, element_sets[i], b))    // b in B
+			result |= (1ull << i);
+	}
+	return result;
 }
 
-NBA::GNBA::GNBA(LTL::BaseNode *ltl_formula, int num_AP) : Automaton() {
+NBA::GNBA::GNBA(
+		LTL::LTLAllocator &allocator,
+		LTL::BaseNode *ltl_formula,
+		int num_AP) : Automaton() {
 	this->num_AP = num_AP;
 
 	auto closure = get_closure(ltl_formula);
@@ -289,9 +305,9 @@ NBA::GNBA::GNBA(LTL::BaseNode *ltl_formula, int num_AP) : Automaton() {
 	// debug end
 
 	// set initial states
-	unsigned formula_index = std::find(closure.begin(), closure.end(), remove_not(ltl_formula)) - closure.begin();
+	unsigned formula_index = std::find(closure.begin(), closure.end(), ltl_formula->remove_not()) - closure.begin();
 	assert(formula_index < closure.size());
-	bool formula_positive = !is_not(ltl_formula);
+	bool formula_positive = !ltl_formula->is_not();
 	for (int i = 0; i < this->num_states; ++i)
 		if (((element_sets[i] >> formula_index) & 1) == formula_positive)
 			this->init_states |= (1ull << i);
@@ -310,4 +326,70 @@ NBA::GNBA::GNBA(LTL::BaseNode *ltl_formula, int num_AP) : Automaton() {
 	// debug end
 
 	// set final states
+	for (auto node: closure) {
+		auto fs = generate_final_states(allocator, closure, element_sets, node);
+		if (fs)
+			this->final_states_list.emplace_back(fs);
+	}
+
+
+	// debug
+	std::cout << "final states list: ";
+	for (auto fs: final_states_list)
+		std::cout << std::format("{:0{}b} ", fs, this->num_states);
+	std::cout << std::endl;
+	// debug end
+}
+
+void NBA::GNBA::remove_unreachable() {
+	// remove unreachable states
+	StateSet reachable = this->init_states;
+	std::queue<int> q;
+	for (int i = 0; i < this->num_states; ++i)
+		if ((this->init_states >> i) & 1)
+			q.push(i);
+	while (!q.empty()) {
+		auto state = q.front();
+		q.pop();
+		for (auto [_, out_edges]: this->transitions[state])
+			for (int i = 0; i < this->num_states; ++i)
+				if (((out_edges >> i) & 1) && ((reachable >> i) & 1) == 0) {
+					q.push(i);
+					reachable |= (1ull << i);
+				}
+	}
+
+	std::vector<int> new_states_map(this->num_states, -1);
+	int lastStateCnt = this->num_states;
+	this->num_states = 0;
+	for (int i = 0; i < lastStateCnt; ++i)
+		if ((reachable >> i) & 1)
+			new_states_map[i] = this->num_states++;
+
+
+	auto old_state_set_to_new_state_set = [&](StateSet old_state_set) {
+		StateSet new_state_set = 0;
+		for (int i = 0; i < this->num_states; ++i)
+			if ((old_state_set >> i) & 1)
+				new_state_set |= (1ull << new_states_map[i]);
+		return new_state_set;
+	};
+	// modify transitions
+	decltype(this->transitions) new_transitions(this->num_states);
+	for (int i = 0; i < lastStateCnt; ++i) {
+		if (!((reachable >> i) & 1))
+			continue;
+		for (auto [ap_set, out_edges]: this->transitions[i]) {
+			auto new_out_edges = old_state_set_to_new_state_set(out_edges);
+			if (new_out_edges == 0)
+				continue;
+			new_transitions[new_states_map[i]][ap_set] = new_out_edges;
+		}
+	}
+	std::swap(new_transitions, this->transitions);
+	// modify init_states
+	this->init_states = old_state_set_to_new_state_set(this->init_states);
+	// modify final_states_list
+	for (auto &fs: this->final_states_list)
+		fs = old_state_set_to_new_state_set(fs);
 }

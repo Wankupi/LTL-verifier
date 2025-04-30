@@ -21,7 +21,9 @@ struct Automaton {
 struct GNBA : Automaton {
 	std::vector<StateSet> final_states_list;
 
-	GNBA(LTL::BaseNode *root, int num_AP);
+	GNBA(LTL::LTLAllocator &allocator, LTL::BaseNode *formula, int num_AP);
+
+	void remove_unreachable();
 };
 
 struct NBA : Automaton {
