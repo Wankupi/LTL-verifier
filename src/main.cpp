@@ -29,25 +29,26 @@ int main() {
 
 	LTL::LTLAllocator allocator{TS};
 
-	for (int i = 0; i < A; ++i) {
+	auto verify = [&](int start_state) -> bool {
 		std::string str;
 		std::getline(ltl_file, str);
 		auto root = LTL::LTL_parse(str, allocator);
-		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
-		NBA::GNBA gnba(allocator, root, TS.AP.size());
+		std::cout << std::format("LTL: {}{}{}", DBG_GREEN, *root, DBG_RESET) << std::endl;
+		GNBA gnba(allocator, root, TS.AP.size());
 		gnba.remove_unreachable();
-		std::cout << std::format("{}", gnba) << std::endl;
+		std::cout << std::format("{}Remove Unreachable{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
+		gnba.transform_to_NBA();
+		std::cout << std::format("{}To NBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
+		return true;
+	};
+
+	for (int i = 0; i < A; ++i) {
+		verify(-1);
 	}
 	for (int i = 0; i < B; ++i) {
 		int state = 0;
 		ltl_file >> state;
-		std::string str;
-		std::getline(ltl_file, str);
-		auto root = LTL::LTL_parse(str, allocator);
-		std::cout << DBG_GREEN << "LTL: " << root << DBG_RESET << std::endl;
-		NBA::GNBA gnba(allocator, root, TS.AP.size());
-		gnba.remove_unreachable();
-		std::cout << std::format("{}", gnba) << std::endl;
+		verify(state);
 	}
 	return 0;
 }

@@ -1,12 +1,8 @@
 #pragma once
 #include "LTL/LTL.h"
 #include "utils/type.h"
-#include <set>
 #include <unordered_map>
 #include <vector>
-
-namespace NBA {
-
 
 struct Automaton {
 	int num_states = 0;
@@ -25,16 +21,11 @@ struct GNBA : Automaton {
 	GNBA(LTL::LTLAllocator &allocator, LTL::BaseNode *formula, int num_AP);
 
 	void remove_unreachable();
+	void transform_to_NBA();
 };
-
-struct NBA : GNBA {
-	NBA(GNBA const &gnba);
-};
-
-} // namespace NBA
 
 template<>
-class std::formatter<NBA::GNBA> {
+class std::formatter<GNBA> {
 public:
 	template<typename ParseContext>
 	constexpr auto parse(ParseContext &ctx) {
@@ -42,10 +33,9 @@ public:
 	}
 
 	template<typename FormatContext>
-	auto format(NBA::GNBA const &gnba, FormatContext &ctx) const {
+	auto format(GNBA const &gnba, FormatContext &ctx) const {
 		auto it = ctx.out();
-		std::format_to(it, R"!(
-GNBA(num_states={})
+		std::format_to(it, R"!(GNBA(num_states={})
   init_states={:0{}b}
   final_states=)!",
 					   gnba.num_states, gnba.init_states, gnba.num_states);

@@ -209,7 +209,7 @@ AtomicPropositionSet get_AP_set(std::vector<LTL::BaseNode *> const &closure, Ele
 }
 
 /// @attention from this function, we should take care of the LiteralBooleanNode
-NBA::GNBA::StateSet generate_final_states(
+GNBA::StateSet generate_final_states(
 		LTL::LTLAllocator &ltl_allocator,
 		std::vector<LTL::BaseNode *> const &closure,
 		std::vector<ElementSet> const &element_sets,
@@ -235,7 +235,7 @@ NBA::GNBA::StateSet generate_final_states(
 	else
 		return 0;
 	// a until b
-	NBA::GNBA::StateSet result = 0;
+	GNBA::StateSet result = 0;
 	for (size_t i = 0; i < element_sets.size(); ++i) {
 		// std::cout << std::format("")
 		if (!is_formula_in_element_set(closure, element_sets[i], formula) // (a until b) not in B
@@ -245,7 +245,7 @@ NBA::GNBA::StateSet generate_final_states(
 	return result;
 }
 
-NBA::GNBA::GNBA(
+GNBA::GNBA(
 		LTL::LTLAllocator &allocator,
 		LTL::BaseNode *ltl_formula,
 		int num_AP) : Automaton() {
@@ -341,7 +341,7 @@ NBA::GNBA::GNBA(
 	// debug end
 }
 
-void NBA::GNBA::remove_unreachable() {
+void GNBA::remove_unreachable() {
 	// remove unreachable states
 	StateSet reachable = this->init_states;
 	std::queue<int> q;
@@ -398,4 +398,42 @@ void NBA::GNBA::remove_unreachable() {
 		if (fs != 0)
 			new_final_states_list.emplace_back(fs);
 	}
+}
+
+
+void GNBA::transform_to_NBA() {
+	if (this->final_states_list.size() <= 1)
+		return;
+
+	int k = this->final_states_list.size();
+
+	int lastStateCnt = this->num_states;
+	this->num_states *= k;
+
+	auto id = [&](int state, int j) {
+		return state + j * lastStateCnt;
+	};
+	auto new_state_set = [&](StateSet states, int j) {
+		StateSet new_state_set = 0;
+		for (int i = 0; i < lastStateCnt; ++i)
+			if ((states >> i) & 1)
+				new_state_set |= (1ull << id(i, j));
+		return new_state_set;
+	};
+	// modify transitions
+	decltype(this->transitions) new_transitions(this->num_states);
+	for (int j = 0; j < k; ++j) {
+		for (int i = 0; i < lastStateCnt; ++i) {
+			int to = (j + ((this->final_states_list[j] >> i) & 1)) % k;
+			new_transitions[id(i, j)] = transitions[i];
+			for (auto &[ap_set, out_edges]: new_transitions[id(i, j)])
+				out_edges = new_state_set(out_edges, to);
+		}
+	}
+	this->transitions = std::move(new_transitions);
+	// modify init_states
+	this->init_states = new_state_set(this->init_states, 0);
+	// modify final_states_list
+	final_states_list.resize(1);
+	final_states_list[0] = new_state_set(final_states_list[0], 0);
 }
