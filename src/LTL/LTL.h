@@ -154,6 +154,10 @@ public:
 
 	template<typename T>
 	BaseNode *create(BaseNode *child) {
+		if constexpr (std::is_same_v<T, NotNode>) { // special case
+			if (auto child_not = child->as<NotNode>())
+				return child_not->child;
+		}
 		auto it = unary_nodes.find({typeid(T), child});
 		if (it != unary_nodes.end())
 			return static_cast<T *>(it->second.get());
@@ -189,6 +193,8 @@ public:
 NodePtr LTL_parse(const std::string &formula, LTLAllocator &allocator);
 
 inline BaseNode const *BaseNode::remove_not() const {
+	// in the allocator, not to construct Not(Not(...))
+	assert(!(this->as<NotNode>() && this->as<NotNode>()->child->as<NotNode>()));
 	if (auto not_node = this->as<NotNode>())
 		return not_node->child;
 	return this;

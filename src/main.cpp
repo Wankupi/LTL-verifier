@@ -1,3 +1,4 @@
+#include "FindLoop.h"
 #include "LTL/LTL.h"
 #include "NBA/NBA.h"
 #include "TransitionSystem.h"
@@ -17,6 +18,8 @@ TransitionSystem read_ts() {
 int main() {
 	TransitionSystem TS = read_ts();
 
+	std::cout << std::format("{}Transition System{}\n{}\n", DBG_BLUE, DBG_RESET, TS) << std::endl;
+
 	std::cout << "start" << std::endl;
 	std::ifstream ltl_file("benchmark.txt");
 	if (!ltl_file) {
@@ -34,21 +37,25 @@ int main() {
 		std::getline(ltl_file, str);
 		auto root = LTL::LTL_parse(str, allocator);
 		std::cout << std::format("LTL: {}{}{}", DBG_GREEN, *root, DBG_RESET) << std::endl;
+		root = allocator.create<LTL::NotNode>(root);
 		GNBA gnba(allocator, root, TS.AP.size());
+
+		std::cout << std::format("{}Current GNBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
 		gnba.remove_unreachable();
 		std::cout << std::format("{}Remove Unreachable{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
 		gnba.transform_to_NBA();
 		std::cout << std::format("{}To NBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
-		return true;
+		return !find_loop(TS, gnba, start_state);
 	};
 
+	std::ofstream out("result.txt");
 	for (int i = 0; i < A; ++i) {
-		verify(-1);
+		out << verify(-1) << '\n';
 	}
 	for (int i = 0; i < B; ++i) {
 		int state = 0;
 		ltl_file >> state;
-		verify(state);
+		out << verify(state) << '\n';
 	}
 	return 0;
 }

@@ -88,6 +88,8 @@ struct Validator {
 		bool negate = false;
 		if (auto not_node = node->as<NotNode>())
 			node = not_node->child, negate = true;
+		if (node->is_bool()) // node is already a "true"
+			return !negate;
 		auto p = value.find(node);
 		if (p == value.end()) {
 			std::cerr << "Validator: Can not find node in current value set: ";

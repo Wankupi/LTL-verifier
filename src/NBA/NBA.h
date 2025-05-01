@@ -22,6 +22,20 @@ struct GNBA : Automaton {
 
 	void remove_unreachable();
 	void transform_to_NBA();
+	bool is_final_state(int state) const {
+		if (final_states_list.empty())
+			return true;
+		for (auto const &fs: final_states_list)
+			if ((fs >> state) & 1)
+				return true;
+		return false;
+	}
+	StateSet get_next_states(int state, AtomicPropositionSet ap) const {
+		auto it = transitions[state].find(ap & used_ap);
+		if (it == transitions[state].end())
+			return 0;
+		return it->second;
+	}
 };
 
 template<>
