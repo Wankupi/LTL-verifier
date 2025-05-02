@@ -1,4 +1,5 @@
 #pragma once
+#include "utils/state.h"
 #include "utils/type.h"
 #include <format>
 #include <iostream>
@@ -6,7 +7,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "utils/state.h"
 
 struct TransitionSystem {
 	int num_states = 0; // number of states
@@ -16,7 +16,7 @@ struct TransitionSystem {
 	using State = int;
 	using Action = int;
 
-	StateSet init_states;                                    // initial states
+	StateSet init_states = 0;                                // initial states
 	std::vector<std::string> AP;                             // atomic propositions
 	std::map<State, std::map<Action, StateSet>> transitions; // transitions
 	std::vector<AtomicPropositionSet> labels;                // labels
@@ -77,13 +77,13 @@ struct std::formatter<TransitionSystem> {
 		for (const auto &label: ts.labels)
 			std::format_to(it, "{:0{}b} ", label, ts.AP.size());
 		std::format_to(it, "\n init_states: ");
-		for (auto s : States(ts.init_states))
+		for (auto s: States(ts.init_states))
 			std::format_to(it, "{} ", s);
-		
+
 		std::format_to(it, "\n transitions:\n");
 		for (const auto &[from, actions]: ts.transitions) {
 			for (const auto &[action, to]: actions) {
-				for (auto s : States(to))
+				for (auto s: States(to))
 					std::format_to(it, "  {} - {} -> {}\n", from, action, s);
 			}
 		}

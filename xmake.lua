@@ -1,6 +1,6 @@
 add_requires("antlr4-runtime 4.13.2")
 add_rules("mode.debug")
-set_languages("c++26")
+set_languages("c++23")
 add_cxflags("-Wall", "-Wextra", "-Wuninitialized", {force = true})
 
 target("antlr-g4")

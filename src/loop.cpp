@@ -81,7 +81,7 @@ struct LoopFinder {
 		GNBA::StateSet nba_init_states = 0;
 		for (auto i: States(gnba.init_states))
 			nba_init_states |= gnba.get_next_states(i, ts.labels[start_state]);
-		std::cout << std::format("NBA init states: {:0{}b}\n", nba_init_states, gnba.num_states) << std::endl;
+		// std::cout << std::format("NBA init states: {:0{}b}\n", nba_init_states, gnba.num_states) << std::endl;
 		for (auto q: States(nba_init_states)) {
 			if (dfs(start_state, q))
 				return true;

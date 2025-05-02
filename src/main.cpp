@@ -18,9 +18,9 @@ TransitionSystem read_ts() {
 int main() {
 	TransitionSystem TS = read_ts();
 
-	std::cout << std::format("{}Transition System{}\n{}\n", DBG_BLUE, DBG_RESET, TS) << std::endl;
+	// std::cout << std::format("{}Transition System{}\n{}\n", DBG_BLUE, DBG_RESET, TS) << std::endl;
 
-	std::cout << "start" << std::endl;
+	// std::cout << "start" << std::endl;
 	std::ifstream ltl_file("benchmark.txt");
 	if (!ltl_file) {
 		std::cerr << "Error opening file benchmark.txt" << std::endl;
@@ -40,12 +40,14 @@ int main() {
 		root = allocator.create<LTL::NotNode>(root);
 		GNBA gnba(allocator, root, TS.AP.size());
 
-		std::cout << std::format("{}Current GNBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
-		gnba.remove_unreachable();
-		std::cout << std::format("{}Remove Unreachable{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
+		// std::cout << std::format("{}Current GNBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
+		// gnba.remove_unreachable();
+		// std::cout << std::format("{}Remove Unreachable{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
 		gnba.transform_to_NBA();
-		std::cout << std::format("{}To NBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
-		return !find_loop(TS, gnba, start_state);
+		// std::cout << std::format("{}To NBA{}\n{}", DBG_BLUE, DBG_RESET, gnba) << std::endl;
+		auto result = !find_loop(TS, gnba, start_state);
+		std::cout << std::format("{}Result: {}{}\n", DBG_RED, result, DBG_RESET) << std::endl;
+		return result;
 	};
 
 	std::ofstream out("result.txt");

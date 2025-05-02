@@ -219,11 +219,12 @@ GNBA::StateSet generate_final_states(
 	// only return non-zero when is { Always, Eventually, Until }
 	// unify them to a until b
 	// a is useless
-	BaseNode *b = nullptr;
-	if (formula->as<AlwaysNode>()) {
-		// always a = a until false
+	BaseNode *b = nullptr, *until = formula;
+	if (auto always_node = formula->as<AlwaysNode>()) {
+		// always a = not (true until not a)
 		// a = always_node->child;
-		b = ltl_allocator.createLiteralBooleanNode(false);
+		b = ltl_allocator.create<NotNode>(always_node->child);
+		until = ltl_allocator.create<NotNode>(formula);
 	}
 	else if (auto eventually_node = formula->as<EventuallyNode>()) {
 		// eventually a = true until a
@@ -240,7 +241,7 @@ GNBA::StateSet generate_final_states(
 	GNBA::StateSet result = 0;
 	for (size_t i = 0; i < element_sets.size(); ++i) {
 		// std::cout << std::format("")
-		if (!is_formula_in_element_set(closure, element_sets[i], formula) // (a until b) not in B
+		if (!is_formula_in_element_set(closure, element_sets[i], until) // (a until b) not in B
 			|| is_formula_in_element_set(closure, element_sets[i], b))    // b in B
 			result |= (1ull << i);
 	}
@@ -260,24 +261,24 @@ GNBA::GNBA(
 	});
 
 	// debug
-	for (auto expr: closure)
-		std::cout << expr << ", ";
-	std::cout << std::endl;
+	// for (auto expr: closure)
+	// 	std::cout << expr << ", ";
+	// std::cout << std::endl;
 	// debug end
 
 	auto element_sets = get_all_element_set(closure);
 
 	// debug
-	auto output_binary = [n = closure.size()](ElementSet B) {
-		for (int i = n - 1; i >= 0; --i)
-			std::cout << ((B >> i) & 1);
-	};
-	std::cout << "get primary set: ";
-	for (auto B: element_sets) {
-		output_binary(B);
-		std::cout << " ";
-	}
-	std::cout << std::endl;
+	// auto output_binary = [n = closure.size()](ElementSet B) {
+	// 	for (int i = n - 1; i >= 0; --i)
+	// 		std::cout << ((B >> i) & 1);
+	// };
+	// std::cout << "get primary set: ";
+	// for (auto B: element_sets) {
+	// 	output_binary(B);
+	// 	std::cout << " ";
+	// }
+	// std::cout << std::endl;
 	// debug end
 
 	this->num_states = element_sets.size();
@@ -295,27 +296,31 @@ GNBA::GNBA(
 	}
 
 	// debug
-	for (int i = 0; i < this->num_states; ++i) {
-		for (auto [ap_set, out_edges]: transitions[i]) {
-			std::cout << std::format("{:0{}b} - {:0{}b} -> {:0{}b}", element_sets[i], closure.size(), ap_set, num_AP, out_edges, element_sets.size()) << std::endl;
-			assert(
-					element_sets[i] >> closure.size() == 0 &&
-					ap_set >> num_AP == 0 &&
-					out_edges >> element_sets.size() == 0);
-		}
-	}
+	// for (int i = 0; i < this->num_states; ++i) {
+	// 	for (auto [ap_set, out_edges]: transitions[i]) {
+	// 		std::cout << std::format("{:0{}b} - {:0{}b} -> {:0{}b}", element_sets[i], closure.size(), ap_set, num_AP, out_edges, element_sets.size()) << std::endl;
+	// 		assert(
+	// 				element_sets[i] >> closure.size() == 0 &&
+	// 				ap_set >> num_AP == 0 &&
+	// 				out_edges >> element_sets.size() == 0);
+	// 	}
+	// }
 	// debug end
 
 	// set initial states
-	unsigned formula_index = std::find(closure.begin(), closure.end(), ltl_formula->remove_not()) - closure.begin();
-	assert(formula_index < closure.size());
-	bool formula_positive = !ltl_formula->is_not();
 	for (int i = 0; i < this->num_states; ++i)
-		if (((element_sets[i] >> formula_index) & 1) == formula_positive)
+		if (is_formula_in_element_set(closure, element_sets[i], ltl_formula))
 			this->init_states |= (1ull << i);
 
+	// unsigned formula_index = std::find(closure.begin(), closure.end(), ltl_formula->remove_not()) - closure.begin();
+	// assert(formula_index < closure.size());
+	// bool formula_positive = !ltl_formula->is_not();
+	// for (int i = 0; i < this->num_states; ++i)
+	// 	if (((element_sets[i] >> formula_index) & 1) == formula_positive)
+	// 		this->init_states |= (1ull << i);
+
 	// debug
-	std::cout << std::format("init_states: {:0{}b}\n", this->init_states, this->num_states);
+	// std::cout << std::format("init_states: {:0{}b}\n", this->init_states, this->num_states);
 	// debug end
 
 	// set used_ap
@@ -324,7 +329,7 @@ GNBA::GNBA(
 			this->used_ap |= ap;
 
 	// debug
-	std::cout << std::format("used_ap: {:0{}b}\n", this->used_ap, num_AP);
+	// std::cout << std::format("used_ap: {:0{}b}\n", this->used_ap, num_AP);
 	// debug end
 
 	// set final states
@@ -336,10 +341,10 @@ GNBA::GNBA(
 
 
 	// debug
-	std::cout << "final states list: ";
-	for (auto fs: final_states_list)
-		std::cout << std::format("{:0{}b} ", fs, this->num_states);
-	std::cout << std::endl;
+	// std::cout << "final states list: ";
+	// for (auto fs: final_states_list)
+	// 	std::cout << std::format("{:0{}b} ", fs, this->num_states);
+	// std::cout << std::endl;
 	// debug end
 }
 
