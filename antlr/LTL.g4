@@ -13,14 +13,14 @@ formula:
 	| False											# False
 	| '(' child = formula ')'						# Parenthesis
 	| Atom											# Atom;
-Eventually: 'F';
-Always: 'G';
-Next: 'X';
-Until: 'U';
-Not: '!';
-Conjunction: '/\\';
-Disjunction: '\\/';
-Implication: '->';
+Eventually: 'F' | 'eventually';
+Always: 'G' | 'always';
+Next: 'X' | 'next';
+Until: 'U' | 'until';
+Not: '!' | 'not';
+Conjunction: '/\\' | 'and';
+Disjunction: '\\/' | 'or';
+Implication: '->' | 'implies';
 True: 'true';
 False: 'false';
 Atom: [a-z]+;

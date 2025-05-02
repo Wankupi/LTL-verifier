@@ -55,8 +55,7 @@ void ltlParserInitialize() {
       "program", "formula"
     },
     std::vector<std::string>{
-      "", "'('", "')'", "'F'", "'G'", "'X'", "'U'", "'!'", "'/\\'", "'\\/'", 
-      "'->'", "'true'", "'false'"
+      "", "'('", "')'", "", "", "", "", "", "", "", "", "'true'", "'false'"
     },
     std::vector<std::string>{
       "", "", "", "Eventually", "Always", "Next", "Until", "Not", "Conjunction", 
