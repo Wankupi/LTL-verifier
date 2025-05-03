@@ -96,29 +96,12 @@ struct Validator {
 			std::cerr << *node << std::endl;
 			throw std::runtime_error("Validator: cannot find node in value");
 		}
-		// std::cout << std::format("Validator: get {} = {}  p->second={} negate={}\n", *node, p->second ^ negate, p->second, negate);
 		return p->second ^ negate;
 	}
 };
 
 using ElementSet = unsigned long long;
-std::vector<ElementSet> get_all_element_set(std::vector<BaseNode *> const &closure) {
-	std::vector<ElementSet> result;
-	int n = closure.size();
-	for (int B = 0; B < (1 << n); ++B) {
-		// std::cout << std::format("B = {:0{}b}\n", B, n);
-		Validator validator;
-		bool pass = false;
-		for (int i = 0; i < n; ++i)
-			if (!validator.validate(closure[i], (B >> i) & 1)) {
-				pass = true;
-				break;
-			}
-		if (pass) continue;
-		result.emplace_back(B);
-	}
-	return result;
-}
+
 
 bool is_formula_in_element_set(std::vector<BaseNode *> const &closure, ElementSet B, BaseNode *formula) {
 	auto pure_node = formula->remove_not();
@@ -141,12 +124,10 @@ Mask operator&(Mask const &lhs, Mask const &rhs) {
 
 Mask get_masked_set(std::vector<BaseNode *> const &closure, BaseNode *node, bool positive, ElementSet B) {
 	auto formula2mask = [&closure](BaseNode *node) -> Mask {
-		if (auto not_node = node->as<NotNode>())
-			node = not_node->child;
-		for (size_t i = 0; i < closure.size(); ++i)
-			if (closure[i] == node)
-				return {1ull << i, ElementSet(closure[i] == node) << i};
-		throw std::runtime_error("get_masked_set: cannot find node in closure");
+		auto pure_node = node->remove_not();
+		unsigned index = std::find(closure.begin(), closure.end(), pure_node) - closure.begin();
+		assert(index < closure.size());
+		return {1ull << index, ElementSet(closure[index] == node) << index};
 	};
 	auto is_in_B = [&closure, &B](BaseNode *node) -> bool { return is_formula_in_element_set(closure, B, node); };
 	if (auto always_node = node->as<AlwaysNode>(); always_node) {
@@ -195,12 +176,35 @@ Mask get_masked_set(std::vector<BaseNode *> const &closure, ElementSet B) {
 	for (int i = 0; i < n; ++i) {
 		int positive = (B >> i) & 1;
 		auto [must_set_i, value_i] = get_masked_set(closure, closure[i], positive, B);
+		if (((must_set & must_set_i) & (value ^ value_i)))
+			return {.must_set = ElementSet(-1), .value = 0};
 		must_set |= must_set_i;
 		value |= value_i;
 		assert((value_i & ~must_set_i) == 0);
 	}
 	return {must_set, value};
 }
+
+std::vector<ElementSet> get_all_element_set(std::vector<BaseNode *> const &closure) {
+	std::vector<ElementSet> result;
+	int n = closure.size();
+	for (int B = 0; B < (1 << n); ++B) {
+		Validator validator;
+		bool pass = false;
+		for (int i = 0; i < n; ++i)
+			if (!validator.validate(closure[i], (B >> i) & 1)) {
+				pass = true;
+				break;
+			}
+		if (pass) continue;
+		// precheck
+		auto [must_set, value] = get_masked_set(closure, B);
+		if (must_set == ElementSet(-1)) continue;
+		result.emplace_back(B);
+	}
+	return result;
+}
+
 
 AtomicPropositionSet get_AP_set(std::vector<LTL::BaseNode *> const &closure, ElementSet B) {
 	AtomicPropositionSet result{};
@@ -240,9 +244,8 @@ GNBA::StateSet generate_final_states(
 	// a until b
 	GNBA::StateSet result = 0;
 	for (size_t i = 0; i < element_sets.size(); ++i) {
-		// std::cout << std::format("")
 		if (!is_formula_in_element_set(closure, element_sets[i], until) // (a until b) not in B
-			|| is_formula_in_element_set(closure, element_sets[i], b))    // b in B
+			|| is_formula_in_element_set(closure, element_sets[i], b))  // b in B
 			result |= (1ull << i);
 	}
 	return result;
@@ -260,26 +263,7 @@ GNBA::GNBA(
 		return *lhs < *rhs;
 	});
 
-	// debug
-	// for (auto expr: closure)
-	// 	std::cout << expr << ", ";
-	// std::cout << std::endl;
-	// debug end
-
 	auto element_sets = get_all_element_set(closure);
-
-	// debug
-	// auto output_binary = [n = closure.size()](ElementSet B) {
-	// 	for (int i = n - 1; i >= 0; --i)
-	// 		std::cout << ((B >> i) & 1);
-	// };
-	// std::cout << "get primary set: ";
-	// for (auto B: element_sets) {
-	// 	output_binary(B);
-	// 	std::cout << " ";
-	// }
-	// std::cout << std::endl;
-	// debug end
 
 	this->num_states = element_sets.size();
 	this->transitions.resize(this->num_states);
@@ -295,42 +279,17 @@ GNBA::GNBA(
 		transitions[i][ap_set] = out_edges;
 	}
 
-	// debug
-	// for (int i = 0; i < this->num_states; ++i) {
-	// 	for (auto [ap_set, out_edges]: transitions[i]) {
-	// 		std::cout << std::format("{:0{}b} - {:0{}b} -> {:0{}b}", element_sets[i], closure.size(), ap_set, num_AP, out_edges, element_sets.size()) << std::endl;
-	// 		assert(
-	// 				element_sets[i] >> closure.size() == 0 &&
-	// 				ap_set >> num_AP == 0 &&
-	// 				out_edges >> element_sets.size() == 0);
-	// 	}
-	// }
-	// debug end
 
 	// set initial states
 	for (int i = 0; i < this->num_states; ++i)
 		if (is_formula_in_element_set(closure, element_sets[i], ltl_formula))
 			this->init_states |= (1ull << i);
 
-	// unsigned formula_index = std::find(closure.begin(), closure.end(), ltl_formula->remove_not()) - closure.begin();
-	// assert(formula_index < closure.size());
-	// bool formula_positive = !ltl_formula->is_not();
-	// for (int i = 0; i < this->num_states; ++i)
-	// 	if (((element_sets[i] >> formula_index) & 1) == formula_positive)
-	// 		this->init_states |= (1ull << i);
-
-	// debug
-	// std::cout << std::format("init_states: {:0{}b}\n", this->init_states, this->num_states);
-	// debug end
 
 	// set used_ap
 	for (auto const &trans: transitions)
 		for (auto const &[ap, _]: trans)
 			this->used_ap |= ap;
-
-	// debug
-	// std::cout << std::format("used_ap: {:0{}b}\n", this->used_ap, num_AP);
-	// debug end
 
 	// set final states
 	for (auto node: closure) {
@@ -338,14 +297,6 @@ GNBA::GNBA(
 		if (fs)
 			this->final_states_list.emplace_back(fs);
 	}
-
-
-	// debug
-	// std::cout << "final states list: ";
-	// for (auto fs: final_states_list)
-	// 	std::cout << std::format("{:0{}b} ", fs, this->num_states);
-	// std::cout << std::endl;
-	// debug end
 }
 
 void GNBA::remove_unreachable() {

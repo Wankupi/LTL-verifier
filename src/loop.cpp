@@ -1,7 +1,6 @@
 #include "FindLoop.h"
 #include "utils/state.h"
 #include <set>
-#include <stack>
 
 struct LoopFinder {
 	TransitionSystem const &ts;
@@ -28,13 +27,6 @@ struct LoopFinder {
 			lf.num_final_states_in_stack += lf.gnba.is_final_state(q);
 		}
 		~StackDaemon() {
-			if (lf.has_find) {
-				std::cout << std::format("({}, {}) {} {}\n",
-										 s,
-										 q,
-										 lf.record_num_final_states[{s, q}],
-										 lf.gnba.is_final_state(q));
-			}
 			lf.num_final_states_in_stack -= lf.gnba.is_final_state(q);
 			lf.stack.pop_back();
 		}
@@ -42,10 +34,7 @@ struct LoopFinder {
 
 	bool dfs(int s, int q) {
 		if (std::find(stack.begin(), stack.end(), std::pair<int, int>{s, q}) != stack.end()) {
-			has_find = (record_num_final_states[{s, q}] < num_final_states_in_stack);
-			if (has_find)
-				std::cout << std::format("Loop found: ({}, {})\n", s, q) << std::endl;
-			return has_find;
+			return has_find = (record_num_final_states[{s, q}] < num_final_states_in_stack);
 		}
 
 		if (visited.count({s, q}))
@@ -81,7 +70,6 @@ struct LoopFinder {
 		GNBA::StateSet nba_init_states = 0;
 		for (auto i: States(gnba.init_states))
 			nba_init_states |= gnba.get_next_states(i, ts.labels[start_state]);
-		// std::cout << std::format("NBA init states: {:0{}b}\n", nba_init_states, gnba.num_states) << std::endl;
 		for (auto q: States(nba_init_states)) {
 			if (dfs(start_state, q))
 				return true;

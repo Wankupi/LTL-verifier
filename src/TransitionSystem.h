@@ -37,7 +37,7 @@ struct TransitionSystem {
 		line = linestream(); // line 3
 		while (line >> x) num_actions += 1;
 
-		line = linestream();
+		line = linestream(); // line 4
 		std::string str;
 		while (line >> str)
 			AP.emplace_back(std::move(str));
