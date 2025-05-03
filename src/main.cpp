@@ -34,7 +34,9 @@ int main() {
 		auto root = LTL::LTL_parse(str, allocator);
 		root = allocator.create<LTL::NotNode>(root);
 		GNBA gnba(allocator, root, TS.AP.size());
+		gnba.remove_unreachable();
 		gnba.transform_to_NBA();
+		gnba.remove_unreachable();
 		auto result = !find_loop(TS, gnba, start_state);
 		return result;
 	};
