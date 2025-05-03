@@ -7,3 +7,4 @@ compile_commands.json
 benchmark.txt
 TS.txt
 result.txt
+test/
