@@ -63,7 +63,7 @@ We use the simple duplicating method to ensure if one final states $\mathcal{F_0
 
 ## Finding Intersection
 
-Finding some $t \in \operatorname{Trace}(TS) \bigcap \mathcal{L}(NBA)$ is equivalent to finding an infinite walk on $TS \otimes NBA$ whose NBA partial-walk should be accepted by the NBA, i.e. the walk should pass the final states infinite times.
+Finding some $t \in \text{Trace}(TS) \bigcap \mathcal{L}(NBA)$ is equivalent to finding an infinite walk on $TS \otimes NBA$ whose NBA partial-walk should be accepted by the NBA, i.e. the walk should pass the final states infinite times.
 
 That means to find a reachable loop with at least one final state.
 
