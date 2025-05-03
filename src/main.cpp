@@ -2,9 +2,7 @@
 #include "LTL/LTL.h"
 #include "NBA/NBA.h"
 #include "TransitionSystem.h"
-#include "utils/color.h"
 #include <cassert>
-#include <curses.h>
 #include <fstream>
 #include <iostream>
 #include <string>
