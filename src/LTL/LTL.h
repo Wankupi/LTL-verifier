@@ -1,8 +1,6 @@
 #pragma once
 #include "TransitionSystem.h"
 #include <cassert>
-#include <compare>
-#include <curses.h>
 #include <format>
 #include <iostream>
 #include <map>
